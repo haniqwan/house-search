@@ -1,0 +1,31 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #1a1208;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+::-webkit-scrollbar { display: none; }
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+}
