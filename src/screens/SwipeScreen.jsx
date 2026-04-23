@@ -1,13 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { C } from '../tokens';
 import Icon from '../components/Icon';
-
-const areaCards = [
-  { name: 'Hackney', emoji: '🏙️', price: '£550k avg', school: 'Outstanding', crime: 'Low', vibe: 'Creative & vibrant', trend: '+8% this year', tags: ['Tube', 'Great cafés', 'Parks'], color: '#f97316' },
-  { name: 'Peckham', emoji: '🌳', price: '£510k avg', school: 'Good', crime: 'Medium', vibe: 'Up & coming', trend: '+12% this year', tags: ['Overground', 'Restaurants', 'Art scene'], color: C.teal },
-  { name: 'Walthamstow', emoji: '🏘️', price: '£480k avg', school: 'Outstanding', crime: 'Low', vibe: 'Leafy & community', trend: '+6% this year', tags: ['Victoria Line', 'Market', 'Parks'], color: C.gold },
-  { name: 'Brixton', emoji: '🎵', price: '£530k avg', school: 'Good', crime: 'Medium', vibe: 'Buzzing & diverse', trend: '+9% this year', tags: ['Victoria Line', 'Market', 'Nightlife'], color: '#8b5cf6' },
-];
+import LONDON_AREAS from '../data/londonAreas';
 
 export default function SwipeScreen() {
   const [idx, setIdx] = useState(0);
@@ -16,9 +10,10 @@ export default function SwipeScreen() {
   const [passed, setPassed] = useState([]);
   const [animDir, setAnimDir] = useState(null);
   const [gone, setGone] = useState(false);
+  const isDragging = useRef(false);
 
-  const card = areaCards[idx % areaCards.length];
-  const nextCard = areaCards[(idx + 1) % areaCards.length];
+  const card = LONDON_AREAS[idx % LONDON_AREAS.length];
+  const nextCard = LONDON_AREAS[(idx + 1) % LONDON_AREAS.length];
 
   const act = (dir) => {
     setAnimDir(dir);
@@ -33,100 +28,153 @@ export default function SwipeScreen() {
     }, 350);
   };
 
-  const cardStyle = {
-    position: 'absolute', inset: 0,
-    transform: gone
-      ? `translateX(${animDir === 'right' ? 400 : -400}px) rotate(${animDir === 'right' ? 20 : -20}deg)`
-      : `translateX(${drag}px) rotate(${drag * 0.05}deg)`,
-    transition: gone ? 'transform 0.35s cubic-bezier(0.4,0,0.2,1)' : 'none',
-    cursor: 'grab',
-  };
+  const cardTransform = gone
+    ? `translateX(${animDir === 'right' ? 600 : -600}px) rotate(${animDir === 'right' ? 18 : -18}deg)`
+    : `translateX(${drag}px) rotate(${drag * 0.04}deg)`;
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: C.bg }}>
-      <div style={{ padding: '56px 20px 0', flexShrink: 0 }}>
-        <h1 style={{ fontFamily: 'DM Serif Display', fontSize: 26, color: C.text }}>Discover Areas</h1>
-        <p style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>Swipe right to save, left to pass</p>
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          <span style={{ fontSize: 12, color: C.accent, background: C.accentLight, padding: '4px 10px', borderRadius: 20, fontWeight: 600 }}>❤️ {liked.length} saved</span>
-          <span style={{ fontSize: 12, color: C.muted, background: C.bgAlt, padding: '4px 10px', borderRadius: 20, fontWeight: 600 }}>✗ {passed.length} passed</span>
-        </div>
+    <div className="page-content">
+      <div className="page-header">
+        <h1>Discover Areas</h1>
+        <p>Swipe right to save an area, left to pass. We'll use your saves to refine recommendations.</p>
       </div>
 
-      <div style={{ flex: 1, position: 'relative', padding: '16px 20px 0', overflow: 'hidden' }}>
-        <div style={{
-          position: 'absolute', left: 20, right: 20, top: 16, bottom: 0,
-          transform: 'scale(0.95) translateY(12px)',
-          borderRadius: 24, overflow: 'hidden',
-          background: nextCard.color + '30', border: `1px solid ${C.faint}`,
-        }}>
-          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 60 }}>{nextCard.emoji}</span>
-          </div>
-        </div>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
+        <span style={{ fontSize: 13, color: C.accent, background: C.accentLight, padding: '5px 14px', borderRadius: 20, fontWeight: 600 }}>❤️ {liked.length} saved</span>
+        <span style={{ fontSize: 13, color: C.muted, background: C.bgAlt, padding: '5px 14px', borderRadius: 20, fontWeight: 600 }}>✕ {passed.length} passed</span>
+      </div>
 
-        <div style={cardStyle}
-          onMouseDown={e => {
-            const sx = e.clientX;
-            const move = ev => setDrag(ev.clientX - sx);
-            const up = () => {
-              document.removeEventListener('mousemove', move);
-              document.removeEventListener('mouseup', up);
-              if (Math.abs(drag) > 80) act(drag > 0 ? 'right' : 'left');
-              else setDrag(0);
-            };
-            document.addEventListener('mousemove', move);
-            document.addEventListener('mouseup', up);
-          }}
-        >
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'start' }}>
+
+        {/* Card stack */}
+        <div style={{ position: 'relative', height: 520, userSelect: 'none' }}>
+          {/* Back card */}
           <div style={{
-            height: '100%', borderRadius: 24, overflow: 'hidden',
-            background: C.card, boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
+            position: 'absolute', inset: 0,
+            borderRadius: 24, background: nextCard.color + '25',
             border: `1px solid ${C.faint}`,
-            display: 'flex', flexDirection: 'column',
+            transform: 'scale(0.96) translateY(14px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
+            <span style={{ fontSize: 64, opacity: 0.4 }}>{nextCard.emoji}</span>
+          </div>
+
+          {/* Main card */}
+          <div
+            style={{
+              position: 'absolute', inset: 0,
+              transform: cardTransform,
+              transition: gone ? 'transform 0.35s cubic-bezier(0.4,0,0.2,1)' : 'none',
+              cursor: isDragging.current ? 'grabbing' : 'grab',
+            }}
+            onMouseDown={e => {
+              isDragging.current = true;
+              const sx = e.clientX;
+              const onMove = ev => setDrag(ev.clientX - sx);
+              const onUp = () => {
+                isDragging.current = false;
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                setDrag(d => { if (Math.abs(d) > 100) { act(d > 0 ? 'right' : 'left'); return d; } return 0; });
+              };
+              document.addEventListener('mousemove', onMove);
+              document.addEventListener('mouseup', onUp);
+            }}
+          >
             <div style={{
-              height: 200, background: `linear-gradient(160deg, ${card.color}30, ${card.color}10)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              position: 'relative', flexShrink: 0,
+              height: '100%', borderRadius: 24, overflow: 'hidden',
+              background: C.card, boxShadow: '0 12px 48px rgba(0,0,0,0.14)',
+              border: `1px solid ${C.faint}`, display: 'flex', flexDirection: 'column',
             }}>
-              <span style={{ fontSize: 72 }}>{card.emoji}</span>
-              {drag > 20 && <div style={{ position: 'absolute', top: 16, left: 16, background: '#22c55e', color: 'white', fontWeight: 800, fontSize: 18, padding: '6px 14px', borderRadius: 12, opacity: Math.min(drag / 80, 1), transform: 'rotate(-12deg)', border: '3px solid #16a34a' }}>SAVE ♥</div>}
-              {drag < -20 && <div style={{ position: 'absolute', top: 16, right: 16, background: '#ef4444', color: 'white', fontWeight: 800, fontSize: 18, padding: '6px 14px', borderRadius: 12, opacity: Math.min(-drag / 80, 1), transform: 'rotate(12deg)', border: '3px solid #dc2626' }}>PASS ✗</div>}
-            </div>
-            <div style={{ padding: 20, flex: 1, overflowY: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div>
-                  <h2 style={{ fontSize: 26, fontWeight: 800, color: C.text, fontFamily: 'DM Serif Display' }}>{card.name}</h2>
-                  <p style={{ fontSize: 14, color: C.muted }}>{card.vibe}</p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{card.price}</div>
-                  <div style={{ fontSize: 12, color: '#22c55e', fontWeight: 600 }}>↑ {card.trend}</div>
-                </div>
+              {/* Visual header */}
+              <div style={{
+                height: 200, flexShrink: 0,
+                background: `linear-gradient(160deg, ${card.color}30, ${card.color}10)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+              }}>
+                <span style={{ fontSize: 80 }}>{card.emoji}</span>
+                {drag > 25 && <div style={{ position: 'absolute', top: 20, left: 20, background: '#22c55e', color: 'white', fontWeight: 800, fontSize: 18, padding: '8px 16px', borderRadius: 12, opacity: Math.min(drag / 100, 1), transform: 'rotate(-12deg)', border: '3px solid #16a34a' }}>SAVE ♥</div>}
+                {drag < -25 && <div style={{ position: 'absolute', top: 20, right: 20, background: '#ef4444', color: 'white', fontWeight: 800, fontSize: 18, padding: '8px 16px', borderRadius: 12, opacity: Math.min(-drag / 100, 1), transform: 'rotate(12deg)', border: '3px solid #dc2626' }}>PASS ✕</div>}
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-                {card.tags.map(t => <span key={t} style={{ fontSize: 12, background: C.bgAlt, color: C.muted, padding: '5px 10px', borderRadius: 20, fontWeight: 500 }}>{t}</span>)}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {[['Crime', card.crime], ['Schools', card.school]].map(([k, v]) => (
-                  <div key={k} style={{ background: C.bgAlt, borderRadius: 12, padding: '10px 12px' }}>
-                    <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginBottom: 2 }}>{k}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{v}</div>
+
+              <div style={{ padding: '20px 24px', flex: 1, overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div>
+                    <h2 style={{ fontSize: 28, fontWeight: 800, color: C.text, fontFamily: 'DM Serif Display' }}>{card.name}</h2>
+                    <p style={{ fontSize: 14, color: C.muted }}>{card.vibe}</p>
                   </div>
-                ))}
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>£{(card.avgPrice / 1000).toFixed(0)}k avg</div>
+                    <div style={{ fontSize: 13, color: '#22c55e', fontWeight: 600 }}>↑ +{card.priceChange}% YoY</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                  {card.tags.map(t => <span key={t} style={{ fontSize: 12, background: C.bgAlt, color: C.muted, padding: '5px 11px', borderRadius: 20, fontWeight: 500 }}>{t}</span>)}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                  {[
+                    ['Crime', '🛡️', `${card.schoolScore > 75 ? 'Low' : 'Medium'}`],
+                    ['Schools', '🏫', `${card.schoolScore}% Good+`],
+                    ['Borough', '🗺️', card.borough],
+                  ].map(([k, e, v]) => (
+                    <div key={k} style={{ background: C.bgAlt, borderRadius: 12, padding: '10px 12px' }}>
+                      <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginBottom: 2 }}>{e} {k}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div style={{ position: 'absolute', bottom: 16, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 24, zIndex: 10 }}>
-          <button onClick={() => act('left')} style={{ width: 58, height: 58, borderRadius: '50%', background: 'white', border: '2px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 16px rgba(239,68,68,0.2)' }}>
-            <Icon name="x" size={24} color="#ef4444" />
-          </button>
-          <button onClick={() => act('right')} style={{ width: 58, height: 58, borderRadius: '50%', background: '#22c55e', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 16px rgba(34,197,94,0.3)' }}>
-            <Icon name="heart" size={24} color="white" />
-          </button>
+        {/* Sidebar: controls + saved list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card" style={{ textAlign: 'center', padding: 28 }}>
+            <p style={{ fontSize: 13, color: C.muted, marginBottom: 18 }}>Drag the card or use buttons</p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 20 }}>
+              <button onClick={() => act('left')} style={{
+                width: 64, height: 64, borderRadius: '50%', background: 'white',
+                border: '2px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', boxShadow: '0 4px 16px rgba(239,68,68,0.2)', transition: 'transform 0.1s',
+              }}>
+                <Icon name="x" size={26} color="#ef4444" />
+              </button>
+              <button onClick={() => act('right')} style={{
+                width: 64, height: 64, borderRadius: '50%', background: '#22c55e',
+                border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', boxShadow: '0 4px 16px rgba(34,197,94,0.3)', transition: 'transform 0.1s',
+              }}>
+                <Icon name="heart" size={26} color="white" />
+              </button>
+            </div>
+          </div>
+
+          {liked.length > 0 && (
+            <div className="card">
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 12 }}>❤️ Saved areas ({liked.length})</h3>
+              {liked.map(name => {
+                const a = LONDON_AREAS.find(x => x.name === name);
+                return (
+                  <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${C.faint}` }}>
+                    <span style={{ fontSize: 18 }}>{a?.emoji}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{name}</div>
+                      <div style={{ fontSize: 11, color: C.muted }}>{a?.vibe}</div>
+                    </div>
+                    <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 600 }}>+{a?.priceChange}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="card" style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
+            <strong style={{ color: C.text, display: 'block', marginBottom: 6 }}>💡 Tip</strong>
+            Use <strong>Area Search</strong> for data-driven matching, or swipe here to explore by feel — both feed into your Tracker.
+          </div>
         </div>
       </div>
     </div>
