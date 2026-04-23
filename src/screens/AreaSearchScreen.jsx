@@ -57,13 +57,18 @@ function AreaResultCard({ area, rank }) {
         }}>{area.emoji}</div>
 
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
             <h3 style={{ fontSize: 20, fontWeight: 800, color: C.text, fontFamily: 'DM Serif Display' }}>
               {area.name}
             </h3>
             {isTop && (
               <span style={{ fontSize: 10, fontWeight: 700, color: C.accent, background: C.accentLight, padding: '3px 8px', borderRadius: 10, letterSpacing: '0.05em' }}>
                 BEST MATCH
+              </span>
+            )}
+            {area.overBudget && (
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', padding: '3px 8px', borderRadius: 10, letterSpacing: '0.04em' }}>
+                ⚠️ ABOVE BUDGET
               </span>
             )}
           </div>
@@ -85,7 +90,11 @@ function AreaResultCard({ area, rank }) {
 
       {/* Key stats row */}
       <div style={{ padding: '0 20px 16px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <StatPill icon="💷" label={`£${(area.avgPrice / 1000).toFixed(0)}k avg`} />
+        <StatPill
+          icon="💷"
+          label={`£${((area.effectivePrice ?? area.avgPrice) / 1000).toFixed(0)}k avg`}
+          color={area.overBudget ? '#b45309' : C.muted}
+        />
         <StatPill icon="📈" label={`+${area.priceChange}% YoY`} color="#22c55e" />
         {area.crimeCount !== null && area.crimeCount !== undefined && (
           <StatPill icon="🛡️" label={`${area.crimeCount} crimes/mo`} />
@@ -122,8 +131,8 @@ function AreaResultCard({ area, rank }) {
 
       {expanded && (
         <div style={{ padding: 20, borderTop: `1px solid ${C.faint}`, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          <DataBox label="Crime rate" value={area.crimeCount !== null ? `${area.crimeCount} reported` : 'N/A'} sub="last month" color="#ef4444" />
-          <DataBox label="Avg price" value={`£${(area.avgPrice / 1000).toFixed(0)}k`} sub={`+${area.priceChange}% YoY`} color={C.accent} />
+          <DataBox label="Crime rate" value={area.crimeCount !== null && area.crimeCount !== undefined ? `${area.crimeCount} crimes` : 'Loading…'} sub="within ~1 mile" color="#ef4444" />
+          <DataBox label="Avg price" value={`£${((area.effectivePrice ?? area.avgPrice) / 1000).toFixed(0)}k`} sub={`+${area.priceChange}% YoY`} color={area.overBudget ? '#b45309' : C.accent} />
           <DataBox label="Schools" value={`${area.schoolScore}%`} sub="Good or Outstanding" color={C.teal} />
           {area.amenityData && (
             <>
@@ -165,6 +174,8 @@ export default function AreaSearchScreen() {
   const [transport, setTransport] = useState({ tube: true, thameslink: false });
   const [spots, setSpots] = useState([{ label: 'Canary Wharf, E14 4AB', time: '30 min' }]);
   const [newSpotLabel, setNewSpotLabel] = useState('');
+  const [budget, setBudget] = useState('');
+  const [propertyType, setPropertyType] = useState('any');
 
   const [status, setStatus] = useState('idle'); // idle | loading | done | error
   const [progress, setProgress] = useState({ pct: 0, message: '' });
@@ -181,6 +192,8 @@ export default function AreaSearchScreen() {
         selectedAmenities: amenities,
         selectedTransport: transport,
         spots,
+        budget: budget ? parseInt(budget.replace(/[^0-9]/g, ''), 10) : null,
+        propertyType,
         onProgress: (pct, message) => setProgress({ pct, message }),
       });
       setResults(scored);
@@ -230,6 +243,52 @@ export default function AreaSearchScreen() {
                   display: 'flex', alignItems: 'center', gap: 6,
                 }}><span>{emoji}</span>{label}</button>
               ))}
+            </div>
+          </div>
+
+          {/* Budget + Property Type */}
+          <div className="card">
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>Budget & Property</h3>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.muted, display: 'block', marginBottom: 6 }}>Max budget</label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: C.muted, fontWeight: 600 }}>£</span>
+                <input
+                  value={budget}
+                  onChange={e => setBudget(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="e.g. 600000"
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    border: `1.5px solid ${C.faint}`, borderRadius: 10,
+                    padding: '10px 12px 10px 26px', fontSize: 14,
+                    fontFamily: 'DM Sans', background: C.bg, color: C.text, outline: 'none',
+                  }}
+                />
+              </div>
+              {budget && (
+                <p style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                  Budget: £{Number(budget).toLocaleString()}
+                  {propertyType === 'flat' && ' (showing flat prices ~25% below area avg)'}
+                  {propertyType === 'house' && ' (showing house prices ~10% above area avg)'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.muted, display: 'block', marginBottom: 6 }}>Property type</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['any','🏠','Any'],['flat','🏢','Flat'],['house','🏡','House']].map(([val, emoji, label]) => (
+                  <button key={val} onClick={() => setPropertyType(val)} style={{
+                    flex: 1, padding: '10px 8px', borderRadius: 10, textAlign: 'center',
+                    border: `1.5px solid ${propertyType === val ? C.accent : C.faint}`,
+                    background: propertyType === val ? C.accentLight : 'transparent',
+                    color: propertyType === val ? C.accent : C.muted,
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans',
+                  }}>
+                    <span style={{ fontSize: 18, display: 'block', marginBottom: 2 }}>{emoji}</span>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -338,7 +397,8 @@ export default function AreaSearchScreen() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <p style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>
-                  <strong style={{ color: C.text }}>{results.length} areas</strong> scored across 6 dimensions
+                  <strong style={{ color: C.text }}>{results.length} areas</strong> scored
+                  {budget ? ` · budget £${Number(budget).toLocaleString()}` : ''}
                 </p>
                 <button onClick={() => setStatus('idle')} style={{ fontSize: 13, color: C.accent, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>← Adjust filters</button>
               </div>

@@ -48,11 +48,30 @@ function parseMaxMinutes(timeStr) {
   return m ? parseInt(m[1]) : 30;
 }
 
+// Effective price for an area given property type preference
+function effectivePrice(area, propertyType) {
+  if (propertyType === 'flat') return Math.round(area.avgPrice * 0.75);
+  if (propertyType === 'house') return Math.round(area.avgPrice * 1.1);
+  return area.avgPrice;
+}
+
+// Affordability score: 100 if well within budget, 0 if over
+function affordabilityScore(area, budget, propertyType) {
+  if (!budget) return 75;
+  const price = effectivePrice(area, propertyType);
+  if (price <= budget * 0.8) return 100;
+  if (price <= budget) return 80;
+  if (price <= budget * 1.1) return 40;
+  return 0;
+}
+
 export async function scoreAreas({
   priorities,        // { crime, schools, transport, amenities, prices, distance }
   selectedAmenities, // { supermarket, gym, cafes, restaurants }
   selectedTransport, // { tube, thameslink }
   spots,             // [{ label, time }]
+  budget,            // number | null — max price £
+  propertyType,      // 'flat' | 'house' | 'any'
   onProgress,        // (pct: number, message: string) => void
 }) {
   const areas = LONDON_AREAS;
@@ -124,6 +143,12 @@ export async function scoreAreas({
     add('prices',     priceScore(area));
     add('distance',   await distanceScore(area, spots, spotCoords));
 
+    // Budget affordability — always factor in if budget is set
+    if (budget) {
+      const aff = affordabilityScore(area, budget, propertyType ?? 'any');
+      dimensions.push({ weight: 1.5, score: aff });
+    }
+
     if (!dimensions.length) return { ...area, matchScore: 50 };
 
     const totalWeight = dimensions.reduce((s, d) => s + d.weight, 0);
@@ -135,6 +160,9 @@ export async function scoreAreas({
     if (selectedTransport.tube && !transportStops[area.id]?.hasUnderground && !area.transportLines.some(l => l.toLowerCase().includes('underground'))) penalty += 20;
     if (selectedTransport.thameslink && !transportStops[area.id]?.hasNationalRail && !area.transportLines.some(l => l.toLowerCase().includes('thameslink'))) penalty += 15;
 
+    const effectivePriceForArea = effectivePrice(area, propertyType ?? 'any');
+    const overBudget = budget ? effectivePriceForArea > budget * 1.1 : false;
+
     return {
       ...area,
       matchScore: Math.max(0, matchScore - penalty),
@@ -142,6 +170,8 @@ export async function scoreAreas({
       crimeCount: crimeCountMap[area.id] ?? null,
       transportData: transportStops[area.id],
       amenityData: amenityCounts[area.id],
+      effectivePrice: effectivePriceForArea,
+      overBudget,
     };
   }));
 

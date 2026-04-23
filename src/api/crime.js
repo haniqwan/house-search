@@ -8,32 +8,33 @@ function cacheKey(lat, lng) {
   return `crime:${lat.toFixed(3)}:${lng.toFixed(3)}`;
 }
 
+let _latestCrimeDate = null;
+async function getLatestDate() {
+  if (_latestCrimeDate) return _latestCrimeDate;
+  try {
+    const res = await fetch(`${BASE}/crimes-street-dates`);
+    if (!res.ok) return null;
+    const dates = await res.json();
+    _latestCrimeDate = dates[0]?.date ?? null;
+    return _latestCrimeDate;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCrimeCount(lat, lng) {
   const key = cacheKey(lat, lng);
   if (CACHE.has(key)) return CACHE.get(key);
 
-  // Use a poly that approximates a ~1km radius square around the point
-  const d = 0.009; // ~1km in degrees
-  const poly = [
-    `${lat - d},${lng - d}`,
-    `${lat - d},${lng + d}`,
-    `${lat + d},${lng + d}`,
-    `${lat + d},${lng - d}`,
-  ].join(':');
-
   try {
-    // Get latest available date first
-    const dateRes = await fetch(`${BASE}/crimes-street-dates`);
-    const dates = await dateRes.json();
-    const latestDate = dates[0]?.date;
-
+    const latestDate = await getLatestDate();
     if (!latestDate) return null;
 
-    const res = await fetch(
-      `${BASE}/crimes-street?poly=${poly}&date=${latestDate}`
-    );
-
+    // Use lat/lng point — API returns crimes within ~1 mile radius
+    const url = `${BASE}/crimes-street/all-crime?lat=${lat}&lng=${lng}&date=${latestDate}`;
+    const res = await fetch(url);
     if (!res.ok) return null;
+
     const crimes = await res.json();
     const count = Array.isArray(crimes) ? crimes.length : 0;
     CACHE.set(key, count);
